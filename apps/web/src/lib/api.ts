@@ -21,7 +21,26 @@ export class ApiError extends Error {
   }
 }
 
+import { isDemoModeActive, resolveMockResponse } from './mockResolver';
+
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+  // If demo mode is active, try backend first but fallback seamlessly to mock
+  if (isDemoModeActive()) {
+    try {
+      const res = await fetch(`${BASE}${path}`, {
+        method,
+        credentials: 'include',
+        headers: body !== undefined ? { 'Content-Type': 'application/json' } : undefined,
+        body: body !== undefined ? JSON.stringify(body) : undefined,
+      });
+      if (res.ok) {
+        if (res.status === 204) return undefined as T;
+        return (await res.json().catch(() => null)) as T;
+      }
+    } catch {}
+    return resolveMockResponse(path, method, body) as T;
+  }
+
   let res: Response;
   try {
     res = await fetch(`${BASE}${path}`, {
@@ -31,6 +50,8 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
       body: body !== undefined ? JSON.stringify(body) : undefined,
     });
   } catch {
+    const mock = resolveMockResponse(path, method, body);
+    if (mock !== undefined) return mock as T;
     throw new ApiError(0, 'network_error', 'Cannot reach the server. Check that the API is running.');
   }
   if (res.status === 204) return undefined as T;

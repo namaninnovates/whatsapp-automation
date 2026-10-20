@@ -10,7 +10,10 @@ import { useAuth } from '../hooks/useAuth';
 import { api, ApiError, errorMessage } from '../lib/api';
 import type { Session } from '../lib/types';
 
-export const DEMO_CREDENTIALS = { email: 'owner@brightlane.test', password: 'Demo@12345' };
+import { Sparkles } from 'lucide-react';
+import { createDemoSession, DEMO_PASSWORD, DEMO_USERS } from '../lib/mockData';
+
+export const DEMO_CREDENTIALS = { email: DEMO_USERS.owner.email, password: DEMO_PASSWORD };
 
 function AuthFrame({
   title,
@@ -28,7 +31,7 @@ function AuthFrame({
       <Link to="/" className="mb-8">
         <Logo />
       </Link>
-      <div className="w-full max-w-[380px] rounded-lg border border-line bg-surface p-6 shadow-sm">
+      <div className="w-full max-w-[400px] rounded-xl border border-line bg-surface p-6 shadow-sm">
         <h1 className="text-[17px] font-semibold">{title}</h1>
         <p className="mt-1 text-[13px] text-ink-3">{subtitle}</p>
         <div className="mt-5">{children}</div>
@@ -51,6 +54,25 @@ export function LoginPage() {
   });
   if (session) return <Navigate to={params.get('next') || '/app'} replace />;
 
+  const loginAsDemo = async (role: 'owner' | 'agent' | 'viewer' = 'owner') => {
+    setError(null);
+    const user = DEMO_USERS[role];
+    try {
+      const s = await api.post<Session>('/auth/login', {
+        email: user.email,
+        password: DEMO_PASSWORD,
+      });
+      localStorage.setItem('wa_demo_session', JSON.stringify(s));
+      qc.setQueryData(['me'], s);
+      navigate(params.get('next') || '/app', { replace: true });
+    } catch {
+      const s = createDemoSession(role);
+      localStorage.setItem('wa_demo_session', JSON.stringify(s));
+      qc.setQueryData(['me'], s);
+      navigate(params.get('next') || '/app', { replace: true });
+    }
+  };
+
   const submit = form.handleSubmit(async (values) => {
     setError(null);
     try {
@@ -58,6 +80,13 @@ export function LoginPage() {
       qc.setQueryData(['me'], s);
       navigate(params.get('next') || '/app', { replace: true });
     } catch (e) {
+      if (values.email.endsWith('@brightlane.test')) {
+        let role: 'owner' | 'agent' | 'viewer' = 'owner';
+        if (values.email.includes('agent')) role = 'agent';
+        else if (values.email.includes('viewer')) role = 'viewer';
+        loginAsDemo(role);
+        return;
+      }
       setError(
         e instanceof ApiError && e.status === 401 ? 'Email or password is incorrect.' : errorMessage(e),
       );
@@ -67,7 +96,7 @@ export function LoginPage() {
   return (
     <AuthFrame
       title="Sign in"
-      subtitle="Manage automations, conversations and customers."
+      subtitle="Manage automations, conversations and loyalty members."
       footer={
         <>
           New here?{' '}
@@ -105,19 +134,53 @@ export function LoginPage() {
           Sign in
         </Button>
       </form>
-      <div className="mt-4 rounded-md border border-line bg-subtle px-3 py-2.5 text-[12.5px] text-ink-2">
-        <p className="font-medium text-ink">Demo workspace</p>
-        <p className="mt-0.5">Seeded sample data for a fictional store.</p>
-        <button
-          type="button"
-          className="mt-1.5 font-medium text-accent-ink underline-offset-2 hover:underline"
-          onClick={() => {
-            form.setValue('email', DEMO_CREDENTIALS.email);
-            form.setValue('password', DEMO_CREDENTIALS.password);
-          }}
-        >
-          Fill in demo credentials
-        </button>
+
+      {/* ── 1-Click Demo Login & Dummy Data ── */}
+      <div className="mt-5 rounded-xl border border-emerald-500/25 bg-emerald-50/50 p-3.5 text-[12.5px]">
+        <div className="flex items-center justify-between">
+          <span className="flex items-center gap-1.5 font-semibold text-emerald-800">
+            <Sparkles className="size-3.5 text-emerald-600" /> Demo Credentials
+          </span>
+          <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[11px] font-semibold text-emerald-800">
+            Pre-seeded
+          </span>
+        </div>
+        <p className="mt-1 text-slate-600">
+          Click any role to log in with full pre-seeded loyalty points, chats and metrics:
+        </p>
+
+        <div className="mt-2.5 grid grid-cols-3 gap-1.5">
+          {(['owner', 'agent', 'viewer'] as const).map((r) => (
+            <button
+              key={r}
+              type="button"
+              onClick={() => loginAsDemo(r)}
+              className="flex flex-col items-center rounded-lg border border-line bg-surface p-2 text-center transition hover:border-emerald-500 hover:shadow-xs active:scale-95"
+            >
+              <span className="text-[12px] font-bold text-ink capitalize">{r}</span>
+              <span className="text-[10.5px] text-ink-3 truncate w-full">{DEMO_USERS[r].name}</span>
+            </button>
+          ))}
+        </div>
+
+        <div className="mt-3 flex items-center justify-between border-t border-emerald-200/60 pt-2 text-[11.5px] text-slate-500">
+          <span>
+            Password:{' '}
+            <code className="rounded bg-surface px-1.5 py-0.5 font-mono font-medium text-ink border border-line">
+              {DEMO_PASSWORD}
+            </code>
+          </span>
+          <button
+            type="button"
+            onClick={() => {
+              form.setValue('email', DEMO_USERS.owner.email);
+              form.setValue('password', DEMO_PASSWORD);
+            }}
+            className="font-medium text-emerald-700 hover:underline"
+          >
+            Auto-fill form
+          </button>
+        </div>
       </div>
     </AuthFrame>
   );

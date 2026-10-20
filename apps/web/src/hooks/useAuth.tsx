@@ -35,7 +35,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     loading: q.isLoading,
     can: (min) => !!session && ROLE_RANK[session.role] >= ROLE_RANK[min],
     signOut: async () => {
-      await api.post('/auth/logout');
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('wa_demo_session');
+      }
+      try {
+        await api.post('/auth/logout');
+      } catch {}
       qc.clear();
       qc.setQueryData(['me'], null);
     },
