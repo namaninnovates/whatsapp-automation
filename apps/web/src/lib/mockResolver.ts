@@ -11,7 +11,7 @@ import {
 } from './mockData';
 
 export function isDemoModeActive(): boolean {
-  if (typeof window === 'undefined') return true;
+  if (typeof window === 'undefined') return false;
   return !!localStorage.getItem('wa_demo_session');
 }
 
@@ -28,7 +28,7 @@ export function resolveMockResponse(path: string, method: string, body?: unknown
         return JSON.parse(raw);
       } catch {}
     }
-    return createDemoSession('owner');
+    return null;
   }
 
   if (cleanPath === '/auth/login') {
@@ -325,6 +325,74 @@ export function resolveMockResponse(path: string, method: string, body?: unknown
         handedOff: false,
         conversationId: 'conv-sim',
       },
+    };
+  }
+
+  // Settings & Integrations
+  if (cleanPath === '/settings/integrations') {
+    return {
+      whatsapp: { status: 'connected', mode: 'SIMULATED' },
+      ai: { effectiveProvider: 'mock_claude' },
+    };
+  }
+
+  if (cleanPath === '/settings/profile') {
+    return {
+      displayName: 'Threadline Loyalty Club',
+      description: 'WhatsApp loyalty points & rewards automation',
+      timezone: 'Asia/Kolkata',
+      contactPhone: '+91 98765 43210',
+    };
+  }
+
+  if (cleanPath === '/settings/team') {
+    return [
+      { id: 'm1', name: 'Aditi Rao', email: 'owner@brightlane.test', role: 'OWNER', createdAt: '2026-08-01T00:00:00Z' },
+      { id: 'm2', name: 'Meera Pillai', email: 'agent@brightlane.test', role: 'AGENT', createdAt: '2026-08-05T00:00:00Z' },
+      { id: 'm3', name: 'Karan Shah', email: 'viewer@brightlane.test', role: 'VIEWER', createdAt: '2026-08-10T00:00:00Z' },
+    ];
+  }
+
+  if (cleanPath.startsWith('/settings/audit')) {
+    return {
+      data: MOCK_ACTIVITY,
+      total: MOCK_ACTIVITY.length,
+      page: 1,
+      pageSize: 30,
+    };
+  }
+
+  // Knowledge base
+  if (cleanPath.startsWith('/knowledge')) {
+    return [
+      {
+        id: 'k1',
+        category: 'POLICY',
+        title: 'Points Redemption Terms',
+        content: 'Points can be redeemed anytime on orders above ₹199. 500 points = ₹50 discount code.',
+        keywords: ['redeem', 'discount', 'points'],
+        isActive: true,
+        updatedAt: new Date().toISOString(),
+      },
+      {
+        id: 'k2',
+        category: 'POLICY',
+        title: 'Tier Thresholds',
+        content: 'Silver: 0-2,499 pts (1x earn). Gold: 2,500-4,999 pts (2x earn). Platinum: 5,000+ pts (3x earn + free shipping).',
+        keywords: ['tier', 'gold', 'silver', 'platinum'],
+        isActive: true,
+        updatedAt: new Date().toISOString(),
+      },
+    ];
+  }
+
+  // AI Assistant
+  if (cleanPath.startsWith('/assistant')) {
+    return {
+      enabled: true,
+      confidenceThreshold: 0.6,
+      tone: 'Warm, helpful and brief. Explain loyalty perks clearly.',
+      recentInteractions: [],
     };
   }
 

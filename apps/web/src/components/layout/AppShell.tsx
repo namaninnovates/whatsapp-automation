@@ -83,8 +83,8 @@ export function AppShell() {
     staleTime: 60_000,
   });
   const live =
-    integrations.data?.whatsapp.status === 'connected' ||
-    integrations.data?.whatsapp.status === 'configured_unverified';
+    integrations.data?.whatsapp?.status === 'connected' ||
+    integrations.data?.whatsapp?.status === 'configured_unverified';
 
   return (
     <div className="flex h-screen overflow-hidden bg-canvas">
