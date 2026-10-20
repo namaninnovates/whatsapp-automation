@@ -11,12 +11,14 @@ import {
 } from './mockData';
 
 export function isDemoModeActive(): boolean {
-  if (typeof window === 'undefined') return false;
+  if (typeof window === 'undefined') return true;
   return !!localStorage.getItem('wa_demo_session');
 }
 
 export function resolveMockResponse(path: string, method: string, body?: unknown): unknown {
-  const cleanPath = path.split('?')[0].replace(/\/$/, '');
+  const [pathname, search] = path.split('?');
+  const cleanPath = pathname.replace(/\/$/, '');
+  const params = new URLSearchParams(search || '');
 
   // Auth endpoints
   if (cleanPath === '/auth/me') {
@@ -61,20 +63,19 @@ export function resolveMockResponse(path: string, method: string, body?: unknown
     };
   }
 
-  // Conversations
+  // Conversations (Inbox)
   if (cleanPath === '/conversations') {
     return {
-      items: MOCK_RECENT_CONVERSATIONS,
+      data: MOCK_RECENT_CONVERSATIONS,
       total: MOCK_RECENT_CONVERSATIONS.length,
       page: 1,
       pageSize: 50,
-      hasMore: false,
     };
   }
 
   if (cleanPath.startsWith('/conversations/')) {
-    const id = cleanPath.replace('/conversations/', '');
-    if (id.endsWith('/messages')) {
+    const sub = cleanPath.replace('/conversations/', '');
+    if (sub.endsWith('/messages')) {
       const b = (body as { body?: string }) || {};
       return {
         id: `msg-${Date.now()}`,
@@ -91,17 +92,24 @@ export function resolveMockResponse(path: string, method: string, body?: unknown
         createdAt: new Date().toISOString(),
       };
     }
-    return MOCK_CONVERSATION_DETAILS[id] || MOCK_CONVERSATION_DETAILS['conv-1'];
+    const convId = sub.split('/')[0];
+    return MOCK_CONVERSATION_DETAILS[convId] || MOCK_CONVERSATION_DETAILS['conv-1'];
   }
 
   // Customers
   if (cleanPath === '/customers') {
     return {
-      items: MOCK_CUSTOMERS,
+      data: MOCK_CUSTOMERS,
+      tags: [
+        { id: 't1', name: 'gold-tier' },
+        { id: 't2', name: 'vip' },
+        { id: 't3', name: 'silver-tier' },
+        { id: 't4', name: 'referral-hero' },
+        { id: 't5', name: 'platinum-tier' },
+      ],
       total: MOCK_CUSTOMERS.length,
       page: 1,
       pageSize: 50,
-      hasMore: false,
     };
   }
 
@@ -110,32 +118,116 @@ export function resolveMockResponse(path: string, method: string, body?: unknown
     const found = MOCK_CUSTOMERS.find((c) => c.id === id) || MOCK_CUSTOMERS[0];
     return {
       ...found,
-      notes: 'High loyalty score. Prefers WhatsApp notifications on weekends.',
-      customFields: { pointsBalance: '2340', tier: 'Gold' },
+      notes: 'Active loyalty club member. 2,340 points balance.',
+      customFields: { pointsBalance: '2340', tier: 'Gold', preferredReward: '₹50 discount' },
       orders: [
         {
           id: 'ord-101',
-          orderNumber: 'ORD-8821',
+          number: 'ORD-8821',
           totalMinor: 499900,
-          status: 'FULFILLED',
-          itemSummary: 'Oslo Desk Lamp (Gold Tier 10% applied)',
+          currency: 'INR',
+          status: 'DELIVERED',
+          items: [{ sku: 'LMP-ARC', name: 'Arc Floor Lamp (Points Applied)', quantity: 1, priceMinor: 499900 }],
           createdAt: new Date(Date.now() - 2 * 86400000).toISOString(),
         },
       ],
       conversations: [
         {
           id: 'conv-1',
+          createdAt: new Date(Date.now() - 6 * 60000).toISOString(),
           status: 'AUTOMATED',
-          lastMessageAt: new Date().toISOString(),
           lastMessagePreview: 'Done! ₹50 discount applied.',
         },
       ],
     };
   }
 
-  // Automations / Workflows
-  if (cleanPath === '/automations' || cleanPath === '/workflows') {
+  // Leads
+  if (cleanPath === '/leads') {
+    return [
+      {
+        id: 'lead-1',
+        status: 'QUALIFIED',
+        interest: 'Corporate Diwali Gifting: 50 Gift Hampers',
+        notes: 'Requested tier discount on bulk purchase',
+        details: { company: 'Infosys Team', quantity: 50 },
+        valueMinor: 12500000,
+        createdAt: new Date(Date.now() - 3600000).toISOString(),
+        updatedAt: new Date().toISOString(),
+        customer: { id: 'cust-1', name: 'Priya Sharma', waId: '919876543210' },
+      },
+      {
+        id: 'lead-2',
+        status: 'NEW',
+        interest: 'In-store Gold Tier consultation',
+        notes: 'Inquiring about wedding registry rewards',
+        details: { store: 'Indiranagar' },
+        valueMinor: 4500000,
+        createdAt: new Date(Date.now() - 14400000).toISOString(),
+        updatedAt: new Date().toISOString(),
+        customer: { id: 'cust-3', name: 'Meera Joshi', waId: '919765432109' },
+      },
+    ];
+  }
+
+  // Workflows / Automations
+  if (cleanPath === '/workflows' || cleanPath === '/automations') {
     return MOCK_WORKFLOWS;
+  }
+
+  if (cleanPath.startsWith('/workflows/')) {
+    const id = cleanPath.replace('/workflows/', '').split('/')[0];
+    const wf = MOCK_WORKFLOWS.find((w) => w.id === id) || MOCK_WORKFLOWS[0];
+    return {
+      ...wf,
+      activeVersionId: 'v1',
+      latestVersionId: 'v1',
+      definition: {
+        trigger: { type: 'keyword', keywords: ['points', 'balance'], match: 'contains' },
+        steps: [
+          { id: 's1', type: 'send_text', text: 'Hi! Checking your current points balance...' },
+          { id: 's2', type: 'business_action', action: 'check_product_availability', params: {} },
+        ],
+      },
+      versions: [{ id: 'v1', version: 1, createdAt: new Date().toISOString() }],
+      validation: { ok: true, errors: [], warnings: [] },
+    };
+  }
+
+  // Menus
+  if (cleanPath === '/menus') {
+    return [
+      {
+        id: 'menu-1',
+        name: 'Main Loyalty Menu',
+        header: 'Threadline Loyalty Club',
+        body: 'Welcome! How can we reward you today?',
+        buttonLabel: 'View Options',
+        isDefault: true,
+        isPublished: true,
+        publishedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        options: [
+          { id: 'opt-1', position: 1, title: 'Check Point Balance', description: 'See your current points and tier', actionType: 'REPLY', actionConfig: {} },
+          { id: 'opt-2', position: 2, title: 'Redeem Points for Discount', description: 'Exchange 500 pts for ₹50 off', actionType: 'REPLY', actionConfig: {} },
+          { id: 'opt-3', position: 3, title: 'Invite Friends (+200 pts)', description: 'Share your referral code', actionType: 'REPLY', actionConfig: {} },
+          { id: 'opt-4', position: 4, title: 'Talk to Support', description: 'Connect with a live agent', actionType: 'HANDOFF', actionConfig: {} },
+        ],
+      },
+    ];
+  }
+
+  // Products
+  if (cleanPath === '/products') {
+    return [
+      { id: 'p1', sku: 'LMP-ARC', name: 'Arc Floor Lamp', category: 'Lighting', priceMinor: 749900, currency: 'INR', stock: 6 },
+      { id: 'p2', sku: 'FUR-ACC', name: 'Rattan Accent Chair', category: 'Furniture', priceMinor: 1249900, currency: 'INR', stock: 3 },
+      { id: 'p3', sku: 'DEC-VASE', name: 'Terracotta Vase Set', category: 'Decor', priceMinor: 159900, currency: 'INR', stock: 22 },
+    ];
+  }
+
+  if (cleanPath === '/products/categories') {
+    return ['Lighting', 'Furniture', 'Decor', 'Rewards'];
   }
 
   // Analytics
@@ -146,17 +238,95 @@ export function resolveMockResponse(path: string, method: string, body?: unknown
     };
   }
 
-  // Business profile
+  // Business Profile
   if (cleanPath.startsWith('/business')) {
     return {
       displayName: 'Threadline Loyalty Club',
       isDemo: true,
       timezone: 'Asia/Kolkata',
       contactPhone: '+91 98765 43210',
-      description: 'Automated WhatsApp loyalty rewards program.',
+      description: 'WhatsApp loyalty and points automation platform.',
     };
   }
 
-  // Fallback generic object
-  return { isDemo: true, ok: true };
+  // Simulator
+  if (cleanPath === '/simulator/info') {
+    return {
+      note: 'WhatsApp Simulator is active and ready.',
+      whatsappMode: 'SIMULATED',
+      samples: [
+        { name: 'Check Points', from: '+91 98765 43210', text: 'How many points do I have?' },
+        { name: 'Redeem Reward', from: '+91 98765 43210', text: 'Redeem 500 points' },
+        { name: 'Tier Benefits', from: '+91 98765 43210', text: 'What are my tier benefits?' },
+        { name: 'Referral Bonus', from: '+91 98765 43210', text: 'Share my referral code' },
+      ],
+    };
+  }
+
+  if (cleanPath === '/simulator/thread') {
+    const waId = params.get('waId') || '919876543210';
+    return {
+      customer: { id: 'cust-sim', name: 'Priya Sharma', waId },
+      conversation: { id: 'conv-sim', status: 'AUTOMATED' as const },
+      messages: MOCK_CONVERSATION_DETAILS['conv-1'].messages,
+    };
+  }
+
+  if (cleanPath === '/simulator/messages') {
+    const b = (body as { text?: string; from?: string }) || {};
+    const text = b.text || 'Hello';
+    const waId = (b.from || '+91 98765 43210').replace(/\D/g, '');
+
+    const replyText = text.toLowerCase().includes('redeem')
+      ? '🎉 ₹50 discount voucher applied! Code: SAVE50-PRIYA. Your new points balance is 2,340 pts.'
+      : text.toLowerCase().includes('point') || text.toLowerCase().includes('balance')
+      ? 'Hi Priya! You currently have 2,840 points (Gold Status). You are 160 points away from Platinum!'
+      : text.toLowerCase().includes('refer')
+      ? 'Your referral code is PRIYA200. Share with friends — they get ₹100 off and you get 200 points!'
+      : `Thanks for messaging Threadline Club! We received: "${text}". Type "points" to check your balance or "redeem" for rewards.`;
+
+    return {
+      customer: { id: 'cust-sim', name: 'Priya Sharma', waId },
+      conversation: { id: 'conv-sim', status: 'AUTOMATED' as const },
+      messages: [
+        ...MOCK_CONVERSATION_DETAILS['conv-1'].messages,
+        {
+          id: `msg-${Date.now()}-in`,
+          direction: 'INBOUND' as const,
+          senderType: 'CUSTOMER' as const,
+          body: text,
+          kind: 'text',
+          payload: null,
+          status: 'READ' as const,
+          error: null,
+          intent: 'user_chat',
+          menuOptionId: null,
+          executionId: null,
+          createdAt: new Date().toISOString(),
+        },
+        {
+          id: `msg-${Date.now()}-out`,
+          direction: 'OUTBOUND' as const,
+          senderType: 'AUTOMATION' as const,
+          body: replyText,
+          kind: 'text',
+          payload: null,
+          status: 'DELIVERED' as const,
+          error: null,
+          intent: null,
+          menuOptionId: null,
+          executionId: 'ex-auto',
+          createdAt: new Date(Date.now() + 500).toISOString(),
+        },
+      ],
+      outcome: {
+        duplicate: false,
+        handledBy: 'Loyalty Automated Bot',
+        handedOff: false,
+        conversationId: 'conv-sim',
+      },
+    };
+  }
+
+  return { ok: true, isDemo: true };
 }

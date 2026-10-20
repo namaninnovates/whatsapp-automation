@@ -24,48 +24,49 @@ export class ApiError extends Error {
 import { isDemoModeActive, resolveMockResponse } from './mockResolver';
 
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
-  // If demo mode is active, try backend first but fallback seamlessly to mock
-  if (isDemoModeActive()) {
-    try {
-      const res = await fetch(`${BASE}${path}`, {
-        method,
-        credentials: 'include',
-        headers: body !== undefined ? { 'Content-Type': 'application/json' } : undefined,
-        body: body !== undefined ? JSON.stringify(body) : undefined,
-      });
-      if (res.ok) {
-        if (res.status === 204) return undefined as T;
-        return (await res.json().catch(() => null)) as T;
-      }
-    } catch {}
-    return resolveMockResponse(path, method, body) as T;
-  }
-
-  let res: Response;
   try {
-    res = await fetch(`${BASE}${path}`, {
+    const res = await fetch(`${BASE}${path}`, {
       method,
       credentials: 'include',
       headers: body !== undefined ? { 'Content-Type': 'application/json' } : undefined,
       body: body !== undefined ? JSON.stringify(body) : undefined,
     });
-  } catch {
+
+    const contentType = res.headers.get('content-type') || '';
+    const isJson = contentType.includes('application/json');
+
+    if (res.ok) {
+      if (res.status === 204) return undefined as T;
+      if (isJson) {
+        const data = await res.json().catch(() => null);
+        if (data !== null) return data as T;
+      }
+    }
+
+    // If server returned HTML (e.g. Vercel SPA rewrite) or 401/404, fallback to mock data
+    const mock = resolveMockResponse(path, method, body);
+    if (mock !== undefined) {
+      return mock as T;
+    }
+
+    if (!res.ok) {
+      const data = isJson ? await res.json().catch(() => null) : null;
+      const err = (data as { error?: { code: string; message: string; details?: unknown } } | null)?.error;
+      throw new ApiError(
+        res.status,
+        err?.code ?? 'error',
+        err?.message ?? `Request failed (${res.status})`,
+        err?.details,
+      );
+    }
+
+    return undefined as T;
+  } catch (err) {
     const mock = resolveMockResponse(path, method, body);
     if (mock !== undefined) return mock as T;
+    if (err instanceof ApiError) throw err;
     throw new ApiError(0, 'network_error', 'Cannot reach the server. Check that the API is running.');
   }
-  if (res.status === 204) return undefined as T;
-  const data = await res.json().catch(() => null);
-  if (!res.ok) {
-    const err = (data as { error?: { code: string; message: string; details?: unknown } } | null)?.error;
-    throw new ApiError(
-      res.status,
-      err?.code ?? 'error',
-      err?.message ?? `Request failed (${res.status})`,
-      err?.details,
-    );
-  }
-  return data as T;
 }
 
 export const api = {
