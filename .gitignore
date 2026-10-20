@@ -1,0 +1,13 @@
+node_modules/
+dist/
+build/
+coverage/
+.vite/
+.cache/
+*.log
+.env
+.env.local
+.env.*.local
+apps/api/src/generated/
+*.tsbuildinfo
+.DS_Store

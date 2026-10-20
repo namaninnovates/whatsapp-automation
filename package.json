@@ -1,0 +1,56 @@
+{
+  "name": "whatsapp-automation",
+  "private": true,
+  "type": "module",
+  "version": "0.1.0",
+  "description": "WhatsApp business automation platform: dashboard, workflow engine, menus, AI assistance and a simulated WhatsApp channel.",
+  "workspaces": [
+    "packages/shared",
+    "packages/workflow-engine",
+    "apps/api",
+    "apps/web"
+  ],
+  "engines": {
+    "node": ">=20.19"
+  },
+  "scripts": {
+    "setup": "npm install && npm run db:up && npm run db:migrate && npm run db:seed",
+    "dev": "concurrently -k -n api,web -c green,blue \"npm run dev -w @wa/api\" \"npm run dev -w @wa/web\"",
+    "build": "npm run build -w @wa/api && npm run build -w @wa/web",
+    "start": "npm run start -w @wa/api",
+    "test": "npm run test:engine && npm run test:api && npm run test:web",
+    "test:engine": "npm run test -w @wa/workflow-engine",
+    "test:api": "npm run test -w @wa/api",
+    "test:web": "npm run test -w @wa/web",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "db:up": "docker compose up -d postgres",
+    "db:down": "docker compose down",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate deploy",
+    "db:migrate:dev": "prisma migrate dev",
+    "db:seed": "tsx prisma/seed.ts",
+    "db:reset": "prisma migrate reset --force",
+    "postinstall": "prisma generate"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "@types/node": "^22.9.0",
+    "concurrently": "^9.1.0",
+    "dotenv": "^16.4.5",
+    "eslint": "^9.39.5",
+    "eslint-plugin-react-hooks": "^5.0.0",
+    "eslint-plugin-react-refresh": "^0.4.14",
+    "globals": "^15.12.0",
+    "prettier": "^3.3.3",
+    "prisma": "7.10.1",
+    "tsx": "^4.19.2",
+    "typescript": "~5.9.3",
+    "typescript-eslint": "^8.13.0"
+  },
+  "overrides": {
+    "esbuild": "^0.28.2"
+  }
+}
